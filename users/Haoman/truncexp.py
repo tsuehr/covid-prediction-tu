@@ -3,10 +3,11 @@ from numbers import Number
 
 import torch
 from torch.distributions import Distribution, constraints
+from torch.distribution.exp_family import ExponentialFamily
 from torch.distributions.utils import broadcast_all
 
 
-class TruncatedExponential(ExponentialFamily):
+class TruncatedExponential(Distribution):
     r"""
     Creates a Exponential distribution parameterized by :attr:`rate`.
 
