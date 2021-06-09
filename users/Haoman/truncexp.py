@@ -8,7 +8,7 @@ from torch.distributions.utils import broadcast_all
 
 
 class TruncatedExponential(Distribution):
-    r"""
+    """
     Creates a Exponential distribution parameterized by :attr:`rate`.
 
     Example::
@@ -21,9 +21,7 @@ class TruncatedExponential(Distribution):
         rate (float or Tensor): rate = 1 / scale of the distribution
     """
     arg_constraints = {'rate': constraints.positive, 'upper': constraints.real}
-    support = constraints.positive
     has_rsample = True
-    _mean_carrier_measure = 0
 
 
     def __init__(self, rate, upper, validate_args=None):
@@ -35,7 +33,7 @@ class TruncatedExponential(Distribution):
         super(TruncatedExponential, self).__init__(batch_shape, validate_args=validate_args)
 
 
-      def log_prob(self, value):
+    def log_prob(self, value):
         if self._validate_args:
             self._validate_sample(value)
         return self.rate.log() - self.rate *(self.upper - value)
