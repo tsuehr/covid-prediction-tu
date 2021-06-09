@@ -6,7 +6,7 @@ from torch.distributions import Distribution, constraints
 from torch.distributions.utils import broadcast_all
 
 
-class Exponential(ExponentialFamily):
+class TruncatedExponential(ExponentialFamily):
     r"""
     Creates a Exponential distribution parameterized by :attr:`rate`.
 
@@ -19,33 +19,19 @@ class Exponential(ExponentialFamily):
     Args:
         rate (float or Tensor): rate = 1 / scale of the distribution
     """
-    arg_constraints = {'rate': constraints.positive, 'upper': constraints.positive}
+    arg_constraints = {'rate': constraints.positive, 'upper': constraints.real}
     support = constraints.positive
     has_rsample = True
     _mean_carrier_measure = 0
 
 
-    def __init__(self, rate, validate_args=None):
-        self.rate, = broadcast_all(rate)
-        batch_shape = torch.Size() if isinstance(rate, Number) else self.rate.size()
-        super(Exponential, self).__init__(batch_shape, validate_args=validate_args)
-
-    def expand(self, batch_shape, _instance=None):
-        new = self._get_checked_instance(Exponential, _instance)
-        batch_shape = torch.Size(batch_shape)
-        new.rate = self.rate.expand(batch_shape)
-        super(Exponential, new).__init__(batch_shape, validate_args=False)
-        new._validate_args = self._validate_args
-        return new
-
-
-    def rsample(self, sample_shape=torch.Size()):
-        shape = self._extended_shape(sample_shape)
-        if torch._C._get_tracing_state():
-            # [JIT WORKAROUND] lack of support for ._exponential()
-            u = torch.rand(shape, dtype=self.rate.dtype, device=self.rate.device)
-            return -(-u).log1p() / self.rate
-        return self.rate.new(shape).exponential_() / self.rate
+    def __init__(self, rate, upper, validate_args=None):
+        self.rate, self.upper= broadcast_all(rate, upper)
+        if isinstance(rate, Number) and isinstance(upper, Number):
+            batch_shape = torch.Size()    
+        else: 
+            self.rate.size()           
+        super(TruncatedExponential, self).__init__(batch_shape, validate_args=validate_args)
 
 
       def log_prob(self, value):
