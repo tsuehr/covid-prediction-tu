@@ -30,7 +30,7 @@ class TruncatedExponential(ExponentialFamily):
         if isinstance(rate, Number) and isinstance(upper, Number):
             batch_shape = torch.Size()    
         else: 
-            self.rate.size()           
+            self.upper.size()           
         super(TruncatedExponential, self).__init__(batch_shape, validate_args=validate_args)
 
 
