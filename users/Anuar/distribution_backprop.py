@@ -2,25 +2,34 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
-'''x = np.linspace(0, 1, 100)
+x = np.linspace(0, 1, 100)
 x = torch.tensor(x)
 alpha = 4
-y = alpha * x
-tau = torch.tensor(10., requires_grad=True)
+beta = 50
+y = alpha * x + beta*x**2
+
+alpha_op = torch.tensor(2., requires_grad=True)
+beta_op = torch.tensor(4., requires_grad=True)
 
 for i in range(10):
-    pred = tau * x
+    pred = alpha_op * x + beta_op*x**2
     loss = (y - pred).pow(2).sum()
+    loss += (((alpha - alpha_op)**4)*0.01).item()
+
     loss.backward()
 
     with torch.no_grad():
-        tau -= tau.grad * 0.01
-        tau.grad = None
+        alpha_op -= alpha_op.grad * 0.01
+        beta_op -= beta_op.grad * 0.01
+        print(loss, beta_op, beta_op.grad, alpha_op, alpha_op.grad)
+        alpha_op.grad = None
+        beta_op.grad = None
+
     plt.plot(pred.detach().numpy())
     plt.plot(y)
-    plt.show()'''
+    plt.show()
 
-
+'''
 def trunc_exponential(scale, upper=1000):
 
     random_sample = torch.distributions.exponential.Exponential(1/scale).rsample()
@@ -55,3 +64,5 @@ for i in range(1000):
         tau_t.grad = None
         c.grad = None
 
+
+'''

@@ -24,6 +24,8 @@ device = torch.device("cpu")
 
 data = pd.read_csv('../../data/covid19model.csv')
 
+toy_data = pickle.load(open("toy.pickle", "rb"))
+
 
 # %%
 
@@ -136,17 +138,15 @@ def compare_results(expected_daily_hospit, phi, ll):
 
     for i in range(0, num_observations):
         p = 1 / (1 + expected_daily_hospit[i] / phi)
-        if p == 1:
-            p = p.clone() - torch.tensor(2.225e-5)
-        dist = torch.distributions.negative_binomial.NegativeBinomial(phi + torch.tensor(2.225e-5), p)
-        ll += dist.log_prob(observed_daily_hospit[i])
+        dist = torch.distributions.negative_binomial.NegativeBinomial(phi, p - torch.tensor(2.225e-5))
+        ll += dist.log_prob(torch.round(observed_daily_hospit[i]))
     return ll
 
 def forward_pass():
     # Initialize y
     y = trunc_exponential(tau, 1000)
     R0 = bij_transform(R0_prime, lower=2, upper=5)
-    phi = bij_transform(phi_prime, lower=1, upper=50)
+    phi = bij_transform(phi_prime, lower=0, upper=50)
     alpha = bij_transform(alpha_prime, lower=0, upper=0.05)
 
     # Calculate prior loss
@@ -175,7 +175,7 @@ def forward_pass():
 
 cero = torch.tensor(0., requires_grad=False, device=device, dtype=dtype)
 num_impute = 6
-observed_daily_hospit = torch.tensor(data.hospit, requires_grad=False, device=device, dtype=dtype)
+observed_daily_hospit = toy_data['observed_daily']
 pi = torch.tensor(data.delay_distr, requires_grad=False, device=device, dtype=dtype)
 serial_interval = torch.tensor(data.serial_interval, requires_grad=False, device=device, dtype=dtype)
 population = torch.tensor(5793636, requires_grad=False, device=device, dtype=dtype)
@@ -230,14 +230,14 @@ dist_sigma = distributions.normal.Normal(loc=torch.tensor([0.1], device=device),
 
 # %%
 
-learning_rate = 1e-3
-epochs = 1000
+learning_rate = 1e-12
+epochs = 100
 complete_time = time.time()
 
 for k in range(epochs):
     start_time = time.time()
-    #decay = (1 - (k / (epochs * 1e5))) ** 2
-    #learning_rate = learning_rate * decay
+    decay = (1 - (k / (epochs * 1e5))) ** 2
+    learning_rate = learning_rate * decay
 
     # forward pass - calculate expected_daily_hospit
     expected_daily_hospit, Rt, ll, R0, phi, alpha = forward_pass()
@@ -246,18 +246,18 @@ for k in range(epochs):
     loss = -ll
     loss.backward()
 
-    if k % 1 == 0:
-        print(f'Time Step: {k}|| Loss: {loss}, RO:{R0}  R0":{R0_prime}, grad: {R0_prime.grad}, alpha": {alpha_prime} grad: {alpha_prime.grad}, phi": {phi_prime} grad: {phi_prime.grad}, sigma: {sigma} grad {sigma.grad}, epsilon_t.mean: {epsilon_t.mean()} grad.mean {epsilon_t.grad.mean()}')
+    if k % 5 == 0:
+        print(f'Time Step: {k}|| Loss: {loss},  R0":{R0_prime}, grad: {R0_prime.grad}, alpha": {alpha_prime} grad: {alpha_prime.grad}, phi": {phi_prime} grad: {phi_prime.grad}, sigma: {sigma} grad {sigma.grad}, epsilon_t.mean: {epsilon_t.mean()} grad.mean {epsilon_t.grad.mean()}')
         #print(f'Time Step: {k}||R0":{R0_prime}, grad: {R0_prime.grad}, R0:{R0}')
 
     with torch.no_grad():  # this part is SGD. can also replace with loss.step
-        tau -= learning_rate * tau.grad * 1e-10
+        tau -= learning_rate * tau.grad
         phi_prime -= learning_rate * phi_prime.grad
         # R0_prime -= learning_rate * R0_prime.grad
-        R0_prime -= learning_rate * R0_prime.grad
+        R0_prime -= 1e-4 * R0_prime.grad
         alpha_prime -= learning_rate * alpha_prime.grad
-        sigma -= learning_rate * sigma.grad * 1e-10
-        epsilon_t -= learning_rate * epsilon_t.grad
+        sigma -= learning_rate * sigma.grad
+        epsilon_t -= learning_rate * epsilon_t.grad * 1e+8
 
         tau.grad = None
         phi_prime.grad = None
@@ -272,20 +272,4 @@ for k in range(epochs):
         plt.legend()
         plt.show()
 
-print("Complete Run:  %s seconds" % (time.time() - complete_time))
 
-# use to save toy data
-
-'''
-toy_data = {'observed_daily': expected_daily_hospit,
-            'R0_prime': R0_prime,
-            'alpha_prime': alpha_prime,
-            'phi_prime': phi_prime,
-            'sigma': sigma,
-            'epsilon_t_mean':epsilon_t.mean()
-            }
-
-pickle.dump(toy_data, open("toy.pickle", "wb")) 
-
-print("Complete Run:  %s seconds" % (time.time() - complete_time))
-'''
