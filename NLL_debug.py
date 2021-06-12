@@ -1,4 +1,4 @@
-# %%
+#%%
 
 import scipy.stats
 import numpy as np
@@ -13,7 +13,7 @@ from torch import rand
 from torch import autograd
 from torch import optim
 
-# %%
+#%%
 
 np.random.seed(seed=101)
 torch.manual_seed(101)
@@ -21,16 +21,15 @@ torch.use_deterministic_algorithms(True)
 dtype = torch.float64
 device = torch.device("cpu")
 
-# %%
+#%%
 
 data = pd.read_csv('data/covid19model.csv')
 
-# %% md
+#%% md
 
 # Initialization
 
-
-# %%
+#%%
 
 cero = torch.tensor(0., requires_grad=False, device=device, dtype=dtype)
 num_impute = 6
@@ -40,11 +39,12 @@ serial_interval = torch.tensor(data.serial_interval, requires_grad=False, device
 population = torch.tensor(5793636, requires_grad=False, device=device, dtype=dtype)
 num_observations = len(observed_daily_hospit)
 
-# %% md
+
+#%% md
 
 ## Initialize latent variables/parameters
 
-# %%
+#%%
 
 tau_prime = torch.tensor(np.random.exponential(1 / 0.03), requires_grad=True, device=device, dtype=dtype)
 phi_prime = torch.tensor(truncnorm.rvs((0 - 25) / 10, (np.inf - 25) / 10, loc=25, scale=10), requires_grad=True,
@@ -68,11 +68,11 @@ for t in range(1, num_observations):
 epsilon_t.requires_grad_(True)
 
 
-# %% md
+#%% md
 
 # Define Forward Pass
 
-# %%
+#%%
 
 def bij_transform(prime, lower, upper):
     # Recieves a value in [-inf, inf] and returns value in [low, upper]
@@ -85,7 +85,7 @@ def bij_transform_inf(prime):
     return torch.exp(prime)
 
 
-# %%
+#%%
 
 def calc_prior_loss(tau, phi, R0, alpha, sigma):
     # log likelihood wrt. our prior ("regularisation")
@@ -106,7 +106,7 @@ def calc_prior_loss(tau, phi, R0, alpha, sigma):
     return ll
 
 
-# %%
+#%%
 
 def seed_init_infect(y):
     # Initialize newly_infected, cumulative_infected, St
@@ -123,7 +123,7 @@ def seed_init_infect(y):
     return newly_infected, cumulative_infected, St
 
 
-# %%
+#%%
 
 def calc_Rt(R0, epsilon_t, sigma, ll):
     # Initialize eta_t
@@ -141,7 +141,7 @@ def calc_Rt(R0, epsilon_t, sigma, ll):
     return Rt, ll
 
 
-# %%
+#%%
 
 def calc_infections(cumulative_infected, newly_infected, St, Rt):
     # Initialize effectively_infectious
@@ -162,7 +162,7 @@ def calc_infections(cumulative_infected, newly_infected, St, Rt):
     return newly_infected
 
 
-# %%
+#%%
 
 def calc_hospit(newly_infected, alpha):
     # Initialize expected_daily_hospit
@@ -178,7 +178,7 @@ def calc_hospit(newly_infected, alpha):
     return expected_daily_hospit
 
 
-# %%
+#%%
 
 def compare_results(expected_daily_hospit, phi, ll):
     # compare observed hospitalizations to model results
@@ -195,7 +195,7 @@ def compare_results(expected_daily_hospit, phi, ll):
     return ll
 
 
-# %%
+#%%
 
 def forward_pass():
     # Initialize y
@@ -227,11 +227,17 @@ def forward_pass():
     return expected_daily_hospit, Rt, ll, tau, R0, phi, alpha, sigma
 
 
-# %% md
+#%% md
 
 # Optimization
 
-# %%
+#%%
+
+# Visualization initialization
+alpha_vis = []
+sigma_vis = []
+R0_vis = []
+tau_vis = []
 
 learning_rate = 1e-4
 epochs = 1000
@@ -251,7 +257,8 @@ for k in range(epochs):
 
     if k % 5 == 0:
         print(
-            f'Time Step: {k}|| Loss: {loss},  R0:{R0}, grad: {R0_prime.grad}, alpha: {alpha} grad: {alpha_prime.grad}, phi: {phi} grad: {phi_prime.grad}, sigma: {sigma} grad {sigma_prime.grad}, epsilon_t.mean: {epsilon_t.mean()} grad.mean {epsilon_t.grad.mean()}')
+            f'\n\nTime Step: {k} || Loss: {loss}\n\nR0:{R0}  grad:{R0_prime.grad}\nalpha:{alpha}  grad:{alpha_prime.grad}\n'
+            f'phi:{phi}  grad:{phi_prime.grad}\nsigma:{sigma}  grad:{sigma_prime.grad}\nepsilon_t.mean:{epsilon_t.mean()}  grad.mean:{epsilon_t.grad.mean()}\n')
         print("This Run:  %s seconds" % (time.time() - start_time))
     with torch.no_grad():  # this part is SGD. can also replace with loss.step
         tau_prime -= learning_rate * tau_prime.grad
@@ -268,14 +275,33 @@ for k in range(epochs):
         sigma_prime.grad = None
         epsilon_t.grad = None
 
+    # Visualization
+    alpha_vis.append(alpha)
+    sigma_vis.append(sigma)
+    R0_vis.append(R0)
+    tau_vis.append(tau)
+
     if k % 10 == 0:
         plt.plot(expected_daily_hospit.cpu().detach().numpy(), label='expected_daily_hospit')
         plt.plot(observed_daily_hospit.cpu().detach().numpy(), label='observed_daily_hospit')
         plt.legend()
+
+        fig, axs = plt.subplots(4)
+        fig.suptitle(f'Time step {k}')
+        axs[0].plot(alpha_vis)
+        axs[0].title.set_text('Alpha')
+        axs[1].plot(sigma_vis)
+        axs[1].title.set_text('Sigma')
+        axs[2].plot(R0_vis)
+        axs[2].title.set_text('R0')
+        axs[3].plot(tau_vis)
+        axs[3].title.set_text('Tau')
+        fig.tight_layout()
         plt.show()
+
 
 print("Complete Run:  %s seconds" % (time.time() - complete_time))
 
-# %%
+#%%
 
 
