@@ -133,9 +133,22 @@ def calc_Rt(R0, epsilon_t, sigma, ll):
     # basic reproduction number as a latent random walk
     beta_0 = torch.log(R0)
     eta_t[0] = beta_0
-    for t in range(1, num_observations):
-        dist_epsilon_t = torch.distributions.Normal(epsilon_t[t - 1], sigma)
-        ll += dist_epsilon_t.log_prob(epsilon_t[t - 1])
+
+    #loss1 = 0
+    #loss2 = 0
+    #for t in range(1, num_observations):
+    #    dist_epsilon_t = torch.distributions.Normal(epsilon_t[t - 1], sigma)
+    #    ll += dist_epsilon_t.log_prob(epsilon_t[t])
+    #    loss1 += dist_epsilon_t.log_prob(epsilon_t[t])
+
+    loc = epsilon_t[:-1].clone()
+    scale = sigma * torch.ones(num_observations-1)
+    mvn = distributions.multivariate_normal.MultivariateNormal(loc, scale_tril=torch.diag(scale))
+    ll += mvn.log_prob(epsilon_t[1:].clone())
+    #loss2 = mvn.log_prob(epsilon_t[1:].clone())
+
+    #print(loss1, loss2)
+
     eta_t[1:num_observations] = beta_0 + epsilon_t[0:num_observations - 1].clone()
     Rt = torch.exp(eta_t)
     return Rt, ll
@@ -239,7 +252,7 @@ sigma_vis = []
 R0_vis = []
 tau_vis = []
 
-learning_rate = 1e-4
+learning_rate = 1e-6
 epochs = 1000
 complete_time = time.time()
 
@@ -252,13 +265,14 @@ for k in range(epochs):
     expected_daily_hospit, Rt, ll, tau, R0, phi, alpha, sigma = forward_pass()
 
     # backward pass
-    loss = ll
+    loss = -ll
     loss.backward()
 
     if k % 5 == 0:
         print(
             f'\n\nTime Step: {k} || Loss: {loss}\n\nR0:{R0}  grad:{R0_prime.grad}\nalpha:{alpha}  grad:{alpha_prime.grad}\n'
-            f'phi:{phi}  grad:{phi_prime.grad}\nsigma:{sigma}  grad:{sigma_prime.grad}\nepsilon_t.mean:{epsilon_t.mean()}  grad.mean:{epsilon_t.grad.mean()}\n')
+            f'phi:{phi}  grad:{phi_prime.grad}\nsigma:{sigma}  grad:{sigma_prime.grad}'
+            f'\nepsilon_t.mean:{epsilon_t.mean()}  grad.mean:{epsilon_t.grad.mean()}\ntau:{tau}  grad:{tau_prime.grad}\n')
         print("This Run:  %s seconds" % (time.time() - start_time))
     with torch.no_grad():  # this part is SGD. can also replace with loss.step
         tau_prime -= learning_rate * tau_prime.grad
@@ -303,5 +317,3 @@ for k in range(epochs):
 print("Complete Run:  %s seconds" % (time.time() - complete_time))
 
 #%%
-
-
