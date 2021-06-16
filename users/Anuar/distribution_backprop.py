@@ -11,10 +11,10 @@ y = alpha * x + beta*x**2
 alpha_op = torch.tensor(2., requires_grad=True)
 beta_op = torch.tensor(4., requires_grad=True)
 
-for i in range(10):
+for i in range(1000):
     pred = alpha_op * x + beta_op*x**2
     loss = (y - pred).pow(2).sum()
-    loss += (((alpha - alpha_op)**4)*0.01).item()
+    loss += (((alpha - alpha_op)**4)*0.01)
 
     loss.backward()
 
@@ -25,9 +25,9 @@ for i in range(10):
         alpha_op.grad = None
         beta_op.grad = None
 
-    plt.plot(pred.detach().numpy())
-    plt.plot(y)
-    plt.show()
+plt.plot(pred.detach().numpy())
+plt.plot(y)
+plt.show()
 
 '''
 def trunc_exponential(scale, upper=1000):
